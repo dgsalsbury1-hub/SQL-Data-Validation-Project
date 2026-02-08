@@ -1,2 +1,13 @@
-# SQL-Data-Validation-Project
-SQL-based data quality assurance for VentureInsight's venture capital analytics platform. This project contains validation queries to verify database integrity following a system upgrade, ensuring accurate investment insights and analytics.
+# SQL Data Validation for VentureInsight Analytics
+
+Data quality validation project for VentureInsight, a venture capital analytics platform. This repository contains SQL queries designed to verify data integrity following a database upgrade, ensuring accurate insights for investment decisions.
+
+## Overview
+As part of VentureInsight's quality assurance process, this project validates that data from the web application correctly populates the backend database. SQL queries extract and verify critical business datasets including company funding, acquisition trends, investor activity, and geographic investment patterns.
+
+## Key Features
+- Data validation queries for startup funding analysis
+- Geographic and sector-based investment trend verification
+- Fund activity classification and analysis
+- Acquisition timeline validation
+- Influencer identification queries for marketing outreach
