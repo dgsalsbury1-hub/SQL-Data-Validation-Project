@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VentureInsight — SQL Data Validation Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080c14;
+  --surface: #0f1623;
+  --surface2: #141d2e;
+  --surface3: #1a2438;
+  --border: #1e2d44;
+  --border2: #253450;
+  --accent: #00e5a0;
+  --accent-dim: rgba(0,229,160,0.12);
+  --accent2: #ff6b6b;
+  --accent3: #ffd166;
+  --accent4: #7b8fff;
+  --text: #dde4f0;
+  --text-muted: #6b7a9e;
+  --text-dim: #2d3a55;
+  --font-mono: 'DM Mono', monospace;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-display: 'Playfair Display', serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(30,45,68,0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30,45,68,0.4) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}
+.app {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8,12,20,0.95);
+  backdrop-filter: blur(16px);
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-mark {
+  width: 28px; height: 28px;
+  background: var(--accent); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.logo-text { font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.logo-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
+.db-status { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #444; }
+.status-dot.online { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: blink 2.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.body { display: grid; grid-template-columns: 280px 1fr; overflow: hidden; }
+.sidebar {
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(15,22,35,0.7);
+}
+.sidebar-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
+.stab {
+  padding: 10px; text-align: center;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px;
+  color: var(--text-muted); cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.stab:hover { color: var(--text); }
+.stab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sidebar-scroll { overflow-y: auto; flex: 1; padding: 16px; }
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.sidebar-panel { display: none; }
+.sidebar-panel.active { display: block; }
+.section-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 8px; margin-top: 16px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.section-label:first-child { margin-top: 0; }
+.table-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 10px;
+  border-radius: 7px; border: 1px solid transparent;
+  background: transparent; color: var(--text);
+  cursor: pointer; margin-bottom: 3px;
+  transition: all 0.13s; text-align: left;
+}
+.table-btn:hover { background: var(--surface2); }
+.table-btn.active { background: var(--accent-dim); border-color: rgba(0,229,160,0.2); }
+.table-icon { font-size: 13px; width: 20px; text-align: center; }
+.table-name { font-family: var(--font-mono); font-size: 12px; flex: 1; }
+.table-rows { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.preset-btn {
+  width: 100%; padding: 10px 12px;
+  border-radius: 7px; border: 1px solid var(--border);
+  background: transparent; color: var(--text);
+  cursor: pointer; margin-bottom: 6px;
+  transition: all 0.13s; text-align: left;
+}
+.preset-btn:hover { background: var(--surface2); border-color: var(--border2); }
+.preset-num { font-family: var(--font-mono); font-size: 9px; color: var(--accent); letter-spacing: 1px; margin-bottom: 2px; }
+.preset-title { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.preset-desc { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.main { display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+.top-pane { border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--border); }
+.stat { padding: 12px 18px; border-right: 1px solid var(--border); position: relative; }
+.stat:last-child { border-right: none; }
+.stat::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; }
+.stat:nth-child(1)::after { background: var(--accent); }
+.stat:nth-child(2)::after { background: var(--accent3); }
+.stat:nth-child(3)::after { background: var(--accent2); }
+.stat:nth-child(4)::after { background: var(--accent4); }
+.stat:nth-child(5)::after { background: #a78bfa; }
+.stat-val { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.1; }
+.stat-key { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+.editor-wrap { background: var(--surface); position: relative; }
+.editor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+}
+.editor-label { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.editor-label .prompt { color: var(--accent); font-size: 13px; }
+.editor-btns { display: flex; gap: 8px; }
+.btn { padding: 5px 14px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-family: var(--font-mono); font-size: 11px; transition: all 0.13s; }
+.btn-run { background: var(--accent); color: #08080c; font-weight: 500; border-color: var(--accent); }
+.btn-run:hover { background: #00cc8e; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,229,160,0.25); }
+.btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+.btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+#sql-editor {
+  display: block; width: 100%; min-height: 130px; max-height: 160px;
+  height: 160px;
+  background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--font-mono); font-size: 12.5px;
+  line-height: 1.75; padding: 14px 16px; resize: none;
+  caret-color: var(--accent); tab-size: 2;
+}
+#sql-editor::placeholder { color: var(--text-dim); }
+.bottom-pane { display: flex; flex-direction: column; overflow: hidden; }
+.result-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+.rtab { padding: 9px 18px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.13s; }
+.rtab:hover { color: var(--text); }
+.rtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.result-meta { padding: 6px 16px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.result-meta .tag { color: var(--accent); }
+.result-meta .err-tag { color: var(--accent2); }
+.rpanel { display: none; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
+.rpanel.active { display: flex; }
+.table-scroll { overflow: auto; flex: 1; }
+.table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead { position: sticky; top: 0; z-index: 5; background: var(--surface2); }
+th { padding: 9px 14px; text-align: left; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 7px 14px; border-bottom: 1px solid rgba(30,45,68,0.6); font-family: var(--font-mono); font-size: 12px; white-space: nowrap; color: var(--text); }
+tr:hover td { background: rgba(0,229,160,0.03); }
+.cell-num { color: var(--accent3); }
+.cell-null { color: var(--text-dim); font-style: italic; }
+.cell-str { color: #a8d8ea; }
+.cell-high { color: var(--accent); font-weight: 500; }
+.cell-mid { color: var(--accent3); }
+.cell-low { color: var(--text-muted); }
+.cell-closed { color: var(--accent2); }
+.cell-operating { color: var(--accent); }
+.empty-state { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: var(--text-dim); font-family: var(--font-mono); font-size: 12px; }
+.empty-icon { font-size: 32px; opacity: 0.4; }
+.error-panel { padding: 16px; margin: 12px; background: rgba(255,107,107,0.07); border: 1px solid rgba(255,107,107,0.2); border-radius: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--accent2); line-height: 1.6; }
+.schema-wrap { padding: 16px; overflow: auto; flex: 1; }
+.schema-table { margin-bottom: 24px; }
+.schema-table-name { font-family: var(--font-mono); font-size: 13px; color: var(--accent3); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.schema-row { display: grid; grid-template-columns: 190px 110px 80px 1fr; gap: 8px; padding: 5px 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); border-bottom: 1px solid rgba(30,45,68,0.4); }
+.schema-row:hover { background: var(--surface2); }
+.schema-col-name { color: var(--text); }
+.schema-col-type { color: var(--accent4); }
+.schema-header-row { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.kw { color: var(--accent4); }
+.fn { color: var(--accent3); }
+.str2 { color: #a8d8ea; }
+kbd { background: var(--surface3); border: 1px solid var(--border2); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="logo">
+    <div class="logo-mark">📊</div>
+    <div>
+      <div class="logo-text">VentureInsight</div>
+      <div class="logo-sub">SQL Data Validation Explorer</div>
+    </div>
+  </div>
+  <div class="db-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Initializing SQLite database...</span>
+  </div>
+</header>
+
+<div class="body">
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="stab active" onclick="switchSidebar('tables',this)">Tables</div>
+      <div class="stab" onclick="switchSidebar('queries',this)">Queries</div>
+    </div>
+    <div class="sidebar-scroll">
+
+      <div class="sidebar-panel active" id="stab-tables">
+        <div class="section-label">Your 5 Tables</div>
+        <button class="table-btn active" onclick="browseTable('company',this)">
+          <span class="table-icon">🏢</span><span class="table-name">company</span><span class="table-rows" id="rc-company">—</span>
+        </button>
+        <button class="table-btn" onclick="browseTable('acquisition',this)">
+          <span class="table-icon">🤝</span><span class="table-name">acquisition</span><span class="table-rows" id="rc-acquisition">—</span>
+        </button>
+        <button class="table-btn" onclick="browseTable('funding_round',this)">
+          <span class="table-icon">💰</span><span class="table-name">funding_round</span><span class="table-rows" id="rc-funding_round">—</span>
+        </button>
+        <button class="table-btn" onclick="browseTable('fund',this)">
+          <span class="table-icon">📁</span><span class="table-name">fund</span><span class="table-rows" id="rc-fund">—</span>
+        </button>
+        <button class="table-btn" onclick="browseTable('people',this)">
+          <span class="table-icon">👤</span><span class="table-name">people</span><span class="table-rows" id="rc-people">—</span>
+        </button>
+        <div class="section-label" style="margin-top:20px;">Relationships</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);line-height:2.2;padding:4px 2px;">
+          funding_round.company_id<br><span style="color:var(--text-dim);padding-left:12px">→ company.id</span><br>
+          acquisition.acquiring_company_id<br><span style="color:var(--text-dim);padding-left:12px">→ company.id</span><br>
+          acquisition.acquired_company_id<br><span style="color:var(--text-dim);padding-left:12px">→ company.id</span>
+        </div>
+      </div>
+
+      <div class="sidebar-panel" id="stab-queries">
+        <div class="section-label">Your 9 Validation Queries</div>
+        <button class="preset-btn" onclick="loadPreset(1)"><div class="preset-num">QUERY 01</div><div class="preset-title">Startup Landscape</div><div class="preset-desc">Count closed startups</div></button>
+        <button class="preset-btn" onclick="loadPreset(2)"><div class="preset-num">QUERY 02</div><div class="preset-title">Sector Analysis — US</div><div class="preset-desc">News sector funding in USA</div></button>
+        <button class="preset-btn" onclick="loadPreset(3)"><div class="preset-num">QUERY 03</div><div class="preset-title">Cash Acquisitions</div><div class="preset-desc">M&amp;A cash deals 2011–2013</div></button>
+        <button class="preset-btn" onclick="loadPreset(4)"><div class="preset-num">QUERY 04</div><div class="preset-title">Industry Influencers</div><div class="preset-desc">Twitter: Silver*</div></button>
+        <button class="preset-btn" onclick="loadPreset(5)"><div class="preset-num">QUERY 05</div><div class="preset-title">Finance Influencers</div><div class="preset-desc">*money* + last name K*</div></button>
+        <button class="preset-btn" onclick="loadPreset(6)"><div class="preset-num">QUERY 06</div><div class="preset-title">Geographic Analysis</div><div class="preset-desc">Total funding by country</div></button>
+        <button class="preset-btn" onclick="loadPreset(7)"><div class="preset-num">QUERY 07</div><div class="preset-title">Funding Volatility</div><div class="preset-desc">Daily MIN/MAX anomalies</div></button>
+        <button class="preset-btn" onclick="loadPreset(8)"><div class="preset-num">QUERY 08</div><div class="preset-title">Fund Classification</div><div class="preset-desc">High / middle / low activity</div></button>
+        <button class="preset-btn" onclick="loadPreset(9)"><div class="preset-num">QUERY 09</div><div class="preset-title">Strategy by Activity</div><div class="preset-desc">AVG rounds per activity tier</div></button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="top-pane">
+      <div class="stats">
+        <div class="stat"><div class="stat-val" id="s-companies" style="color:var(--accent)">—</div><div class="stat-key">Companies</div></div>
+        <div class="stat"><div class="stat-val" id="s-closed" style="color:var(--accent3)">—</div><div class="stat-key">Closed</div></div>
+        <div class="stat"><div class="stat-val" id="s-rounds" style="color:var(--accent2)">—</div><div class="stat-key">Funding Rounds</div></div>
+        <div class="stat"><div class="stat-val" id="s-funds" style="color:var(--accent4)">—</div><div class="stat-key">Funds</div></div>
+        <div class="stat"><div class="stat-val" id="s-people" style="color:#a78bfa">—</div><div class="stat-key">People</div></div>
+      </div>
+      <div class="editor-wrap">
+        <div class="editor-header">
+          <div class="editor-label">
+            <span class="prompt">›_</span>
+            <span>SQL Editor</span>
+            <span style="font-size:10px;opacity:0.5">— <kbd>Ctrl+Enter</kbd> to run</span>
+          </div>
+          <div class="editor-btns">
+            <button class="btn btn-ghost" onclick="clearEditor()">Clear</button>
+            <button class="btn btn-run" onclick="runQuery()">▶ Run</button>
+          </div>
+        </div>
+        <textarea id="sql-editor" spellcheck="false" placeholder="-- Write SQL here or pick a query from the sidebar&#10;SELECT * FROM company LIMIT 10;">SELECT * FROM company LIMIT 10;</textarea>
+      </div>
+    </div>
+
+    <div class="bottom-pane">
+      <div class="result-tabs">
+        <div class="rtab active" onclick="switchResult('data',this)">Results</div>
+        <div class="rtab" onclick="switchResult('schema',this)">Schema</div>
+      </div>
+      <div class="result-meta" id="result-meta"><span>Ready — run a query or select a preset</span></div>
+
+      <div class="rpanel active" id="rp-data">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">⬆</div>
+          <div>Run a query to see results here</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Try clicking any Query from the sidebar</div>
+        </div>
+        <div class="table-scroll" id="table-scroll" style="display:none;"></div>
+        <div class="error-panel" id="error-panel" style="display:none;"></div>
+      </div>
+
+      <div class="rpanel" id="rp-schema">
+        <div class="schema-wrap" id="schema-wrap"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const PRESETS = {
+  1:{label:'QUERY 01 — Startup Landscape Analysis',sql:`-- Business Purpose: Verify closed startup status in database
+-- Data Validation: Count companies with status = 'closed'
+SELECT COUNT(*) AS closed_startups
+FROM company
+WHERE status = 'closed';`},
+  2:{label:'QUERY 02 — Sector Analysis for US Investors',sql:`-- Business Purpose: Analyze funding by country and industry sector
+-- Data Validation: Fund amounts for news industry in USA
+SELECT funding_total
+FROM company
+WHERE country_code = 'USA'
+  AND category_code = 'news'
+ORDER BY funding_total DESC;`},
+  3:{label:'QUERY 03 — Analyzing Cash Acquisitions',sql:`-- Business Purpose: Total cash acquisition amounts 2011-2013
+-- Note: SQLite uses strftime() instead of EXTRACT(YEAR FROM ...)
+SELECT SUM(price_amount) AS total_acquisitions
+FROM acquisition
+WHERE term_code = 'cash'
+  AND CAST(strftime('%Y', acquired_at) AS INTEGER) BETWEEN 2011 AND 2013;`},
+  4:{label:'QUERY 04 — Identifying Industry Influencers',sql:`-- Business Purpose: Find people with "Silver" in Twitter handle
+SELECT first_name, last_name, twitter_username
+FROM people
+WHERE twitter_username LIKE 'Silver%';`},
+  5:{label:'QUERY 05 — Finding Finance Influencers',sql:`-- Business Purpose: Finance influencers for FinTech campaign
+SELECT *
+FROM people
+WHERE twitter_username LIKE '%money%'
+  AND last_name LIKE 'K%';`},
+  6:{label:'QUERY 06 — Geographic Investments Analysis',sql:`-- Business Purpose: Total funding by country for investment strategy
+SELECT
+  country_code,
+  SUM(funding_total) AS total_funding
+FROM company
+GROUP BY country_code
+ORDER BY total_funding DESC;`},
+  7:{label:'QUERY 07 — Funding Round Volatility Analysis',sql:`-- Business Purpose: Daily funding anomaly detection
+SELECT
+  funded_at,
+  MIN(raised_amount) AS lowest_amount,
+  MAX(raised_amount) AS highest_amount
+FROM funding_round
+GROUP BY funded_at
+HAVING MIN(raised_amount) != 0
+  AND MIN(raised_amount) != MAX(raised_amount)
+ORDER BY funded_at DESC
+LIMIT 40;`},
+  8:{label:'QUERY 08 — Fund Activity Classification',sql:`-- Business Purpose: Categorize funds by investment activity level
+SELECT
+  *,
+  CASE
+    WHEN invested_companies >= 100 THEN 'high_activity'
+    WHEN invested_companies >= 20  THEN 'middle_activity'
+    ELSE                                'low_activity'
+  END AS activity_level
+FROM fund
+ORDER BY invested_companies DESC;`},
+  9:{label:'QUERY 09 — Investment Strategy by Fund Activity',sql:`-- Business Purpose: Compare avg investment rounds per activity tier
+SELECT
+  CASE
+    WHEN invested_companies >= 100 THEN 'high_activity'
+    WHEN invested_companies >= 20  THEN 'middle_activity'
+    ELSE                                'low_activity'
+  END AS activity_level,
+  ROUND(AVG(investment_rounds)) AS avg_investment_rounds
+FROM fund
+GROUP BY activity_level
+ORDER BY avg_investment_rounds ASC;`}
+};
+
+const SCHEMA_SQL = `
+CREATE TABLE company (id INTEGER PRIMARY KEY,name TEXT,status TEXT,country_code TEXT,category_code TEXT,funding_total REAL,founded_year INTEGER,city TEXT);
+CREATE TABLE acquisition (id INTEGER PRIMARY KEY,acquiring_company_id INTEGER,acquired_company_id INTEGER,term_code TEXT,price_amount REAL,acquired_at TEXT);
+CREATE TABLE funding_round (id INTEGER PRIMARY KEY,company_id INTEGER,funded_at TEXT,funding_round_type TEXT,raised_amount REAL);
+CREATE TABLE fund (id INTEGER PRIMARY KEY,name TEXT,invested_companies INTEGER,investment_rounds INTEGER,fund_size REAL);
+CREATE TABLE people (id INTEGER PRIMARY KEY,first_name TEXT,last_name TEXT,twitter_username TEXT,affiliation_name TEXT);
+`;
+
+const SEED_SQL = `
+INSERT INTO company VALUES
+(1,'TechCrunch','closed','USA','news',5200000,2005,'San Francisco'),
+(2,'Mashable','closed','USA','news',17100000,2005,'New York'),
+(3,'Business Insider','operating','USA','news',49000000,2007,'New York'),
+(4,'Vox Media','operating','USA','news',300000000,2003,'Washington'),
+(5,'BuzzFeed','operating','USA','news',496000000,2006,'New York'),
+(6,'The Athletic','operating','USA','news',139500000,2016,'San Francisco'),
+(7,'Axios','operating','USA','news',55000000,2016,'Arlington'),
+(8,'Quartz','closed','USA','news',8000000,2012,'New York'),
+(9,'Bleacher Report','acquired','USA','news',175000000,2005,'San Francisco'),
+(10,'Politico','operating','USA','news',0,2006,'Arlington'),
+(11,'Stripe','operating','USA','software',600000000,2010,'San Francisco'),
+(12,'Twilio','ipo','USA','software',250000000,2008,'San Francisco'),
+(13,'Dropbox','ipo','USA','software',600000000,2007,'San Francisco'),
+(14,'Box','ipo','USA','software',500000000,2005,'Redwood City'),
+(15,'Zendesk','ipo','USA','software',85000000,2007,'San Francisco'),
+(16,'HubSpot','ipo','USA','software',100000000,2006,'Cambridge'),
+(17,'Mailchimp','acquired','USA','software',0,2001,'Atlanta'),
+(18,'Asana','ipo','USA','software',213000000,2008,'San Francisco'),
+(19,'Notion','operating','USA','software',343000000,2013,'San Francisco'),
+(20,'Figma','acquired','USA','software',333000000,2012,'San Francisco'),
+(21,'Robinhood','ipo','USA','finance',1380000000,2013,'Menlo Park'),
+(22,'Chime','operating','USA','finance',2300000000,2013,'San Francisco'),
+(23,'Plaid','operating','USA','finance',425000000,2013,'San Francisco'),
+(24,'Brex','operating','USA','finance',1200000000,2017,'San Francisco'),
+(25,'Affirm','ipo','USA','finance',1500000000,2012,'San Francisco'),
+(26,'Coinbase','ipo','USA','finance',547000000,2012,'San Francisco'),
+(27,'Klarna','operating','SWE','finance',2900000000,2005,'Stockholm'),
+(28,'Revolut','operating','GBR','finance',1700000000,2015,'London'),
+(29,'Monzo','operating','GBR','finance',500000000,2015,'London'),
+(30,'Nubank','ipo','BRA','finance',2400000000,2013,'Sao Paulo'),
+(31,'SpaceX','operating','USA','space',7900000000,2002,'Hawthorne'),
+(32,'Relativity Space','operating','USA','space',1300000000,2015,'Long Beach'),
+(33,'Planet Labs','ipo','USA','space',545000000,2010,'San Francisco'),
+(34,'Rivian','ipo','USA','automotive',10800000000,2009,'Irvine'),
+(35,'Lucid Motors','ipo','USA','automotive',4400000000,2007,'Newark'),
+(36,'Databricks','operating','USA','analytics',3500000000,2013,'San Francisco'),
+(37,'Palantir','ipo','USA','analytics',2700000000,2003,'Denver'),
+(38,'Snowflake','ipo','USA','analytics',1400000000,2012,'Bozeman'),
+(39,'Looker','acquired','USA','analytics',280000000,2012,'Santa Cruz'),
+(40,'Amplitude','ipo','USA','analytics',336000000,2012,'San Francisco'),
+(41,'Duolingo','ipo','USA','education',183000000,2011,'Pittsburgh'),
+(42,'Coursera','ipo','USA','education',293000000,2012,'Mountain View'),
+(43,'MasterClass','operating','USA','education',461000000,2015,'San Francisco'),
+(44,'Udemy','ipo','USA','education',223000000,2009,'San Francisco'),
+(45,'Byjus','operating','IND','education',5800000000,2011,'Bangalore'),
+(46,'Grab','ipo','SGP','transportation',9800000000,2012,'Singapore'),
+(47,'Gojek','operating','IDN','transportation',5200000000,2010,'Jakarta'),
+(48,'Ola','operating','IND','transportation',3800000000,2010,'Bangalore'),
+(49,'Lyft','ipo','USA','transportation',5100000000,2012,'San Francisco'),
+(50,'Uber','ipo','USA','transportation',24200000000,2009,'San Francisco'),
+(51,'Airbnb','ipo','USA','hospitality',6400000000,2008,'San Francisco'),
+(52,'Vrbo','acquired','USA','hospitality',160000000,1995,'Austin'),
+(53,'Opendoor','ipo','USA','real_estate',1900000000,2014,'San Francisco'),
+(54,'Compass','ipo','USA','real_estate',1570000000,2012,'New York'),
+(55,'Poshmark','ipo','USA','ecommerce',160000000,2011,'Redwood City'),
+(56,'StockX','operating','USA','ecommerce',685000000,2015,'Detroit'),
+(57,'Faire','operating','USA','ecommerce',1000000000,2017,'San Francisco'),
+(58,'Glossier','operating','USA','ecommerce',266000000,2014,'New York'),
+(59,'Away','closed','USA','ecommerce',181000000,2015,'New York'),
+(60,'Warby Parker','ipo','USA','ecommerce',535000000,2010,'New York');
+
+INSERT INTO acquisition VALUES
+(1,50,10,'cash',3200000000,'2010-04-15'),
+(2,11,20,'cash',1000000000,'2022-09-14'),
+(3,38,39,'cash',2600000000,'2019-11-29'),
+(4,1,2,'cash',182000000,'2013-01-01'),
+(5,3,4,'stock',300000000,'2011-06-10'),
+(6,5,8,'cash',50000000,'2013-08-22'),
+(7,50,47,'cash',5000000000,'2021-05-21'),
+(8,46,48,'cash',1800000000,'2021-11-05'),
+(9,14,17,'cash',12000000000,'2021-09-13'),
+(10,37,3,'cash',500000000,'2012-07-19'),
+(11,34,35,'stock',8900000000,'2023-01-15'),
+(12,51,52,'cash',1630000000,'2015-11-10'),
+(13,36,1,'cash',1300000000,'2012-12-04'),
+(14,9,6,'cash',4750000000,'2013-08-05'),
+(15,15,16,'stock',750000000,'2011-03-17'),
+(16,21,22,'cash',9000000000,'2013-02-28'),
+(17,44,43,'cash',825000000,'2012-10-31'),
+(18,49,50,'stock',3200000000,'2011-07-12'),
+(19,53,54,'cash',450000000,'2013-05-14'),
+(20,55,56,'cash',680000000,'2012-09-09'),
+(21,26,27,'cash',4400000000,'2011-11-01'),
+(22,30,28,'stock',2100000000,'2013-04-20'),
+(23,42,41,'cash',600000000,'2012-06-15'),
+(24,24,25,'cash',190000000,'2013-12-12'),
+(25,60,59,'stock',400000000,'2011-08-30'),
+(26,58,57,'cash',850000000,'2013-03-03'),
+(27,1,19,'cash',210000000,'2012-01-18'),
+(28,11,18,'stock',150000000,'2013-07-07'),
+(29,33,32,'cash',920000000,'2011-05-25'),
+(30,31,33,'cash',5700000000,'2013-10-10');
+
+INSERT INTO funding_round VALUES
+(1,11,'2011-02-01','series-a',2000000),(2,11,'2012-07-09','series-b',18000000),
+(3,11,'2014-01-23','series-c',80000000),(4,11,'2016-11-25','series-d',150000000),
+(5,21,'2013-04-18','seed',3000000),(6,21,'2014-09-30','series-a',13000000),
+(7,21,'2017-04-26','series-b',110000000),(8,21,'2020-08-18','series-g',660000000),
+(9,22,'2013-12-01','seed',1500000),(10,22,'2016-03-09','series-a',9000000),
+(11,22,'2018-03-01','series-b',70000000),(12,22,'2021-08-13','series-f',750000000),
+(13,36,'2013-10-07','series-a',14000000),(14,36,'2015-06-05','series-b',60000000),
+(15,36,'2017-01-19','series-c',140000000),(16,36,'2021-08-31','series-h',1600000000),
+(17,34,'2011-09-26','series-a',5000000),(18,34,'2013-01-08','series-b',26000000),
+(19,34,'2017-06-05','series-c',450000000),(20,34,'2020-07-10','series-e',2500000000),
+(21,31,'2015-01-20','series-a',1000000000),(22,31,'2018-02-06','series-b',500000000),
+(23,31,'2020-08-18','series-c',1900000000),(24,46,'2014-04-23','series-a',15000000),
+(25,46,'2015-12-11','series-b',80000000),(26,46,'2018-04-01','series-g',1460000000),
+(27,50,'2010-05-25','series-a',11000000),(28,50,'2011-12-07','series-b',37000000),
+(29,50,'2014-06-06','series-d',1200000000),(30,50,'2016-02-19','series-g',2100000000),
+(31,27,'2014-06-10','series-a',10000000),(32,27,'2015-12-16','series-b',60000000),
+(33,27,'2019-08-06','series-h',460000000),(34,30,'2015-03-01','series-a',14000000),
+(35,30,'2017-01-26','series-c',150000000),(36,30,'2021-06-09','series-g',750000000),
+(37,1,'2018-09-27','seed',2000000),(38,1,'2019-11-22','series-a',20000000),
+(39,1,'2021-03-15','series-b',75000000),(40,2,'2013-12-01','seed',2800000),
+(41,4,'2015-04-28','series-a',35000000),(42,4,'2018-06-27','series-c',200000000),
+(43,5,'2015-08-11','series-a',49000000),(44,5,'2018-04-09','series-c',200000000),
+(45,6,'2017-08-29','series-b',40000000),(46,7,'2017-06-01','series-a',10000000),
+(47,7,'2018-11-30','series-b',28000000),(48,23,'2014-08-01','series-a',9000000),
+(49,23,'2016-06-01','series-b',44000000),(50,23,'2018-12-11','series-c',250000000),
+(51,24,'2018-04-05','seed',7000000),(52,24,'2019-06-18','series-a',57000000),
+(53,24,'2020-04-30','series-c',150000000),(54,25,'2012-11-01','series-a',8000000),
+(55,25,'2014-07-17','series-b',325000000),(56,25,'2020-09-18','series-g',500000000),
+(57,37,'2014-12-02','series-a',15000000),(58,37,'2015-09-30','series-b',90000000),
+(59,38,'2012-06-01','series-a',5000000),(60,38,'2014-10-01','series-b',26000000),
+(61,38,'2018-01-26','series-d',263000000),(62,41,'2011-11-01','series-a',3300000),
+(63,41,'2014-06-11','series-b',45000000),(64,41,'2017-07-21','series-d',25000000),
+(65,42,'2012-05-01','series-a',16000000),(66,42,'2014-01-14','series-b',49400000),
+(67,43,'2015-09-22','series-a',2000000),(68,43,'2018-05-22','series-c',80000000),
+(69,49,'2012-06-01','series-a',7500000),(70,49,'2013-05-22','series-b',60000000),
+(71,49,'2015-03-11','series-e',530000000),(72,51,'2009-04-01','seed',620000),
+(73,51,'2010-11-10','series-a',7200000),(74,51,'2011-07-25','series-b',112000000),
+(75,51,'2014-04-16','series-d',475000000),(76,60,'2012-09-17','series-a',12000000),
+(77,60,'2013-11-12','series-b',60000000),(78,60,'2015-04-30','series-c',100000000),
+(79,44,'2010-01-01','series-a',1000000),(80,44,'2012-04-16','series-b',32000000);
+
+INSERT INTO fund VALUES
+(1,'Sequoia Capital Global',500,2400,85000000000),
+(2,'Andreessen Horowitz',420,1800,35000000000),
+(3,'Accel Partners',380,1600,14000000000),
+(4,'Kleiner Perkins',310,1400,9000000000),
+(5,'Lightspeed Venture',290,1200,18000000000),
+(6,'Benchmark Capital',185,820,3500000000),
+(7,'Tiger Global',450,2100,95000000000),
+(8,'SoftBank Vision Fund',210,480,100000000000),
+(9,'General Catalyst',175,740,8000000000),
+(10,'GV Google Ventures',260,980,7500000000),
+(11,'Index Ventures',155,620,7000000000),
+(12,'Bessemer Venture',200,870,16000000000),
+(13,'NEA Partners',165,720,3800000000),
+(14,'Founders Fund',95,380,11000000000),
+(15,'Greylock Partners',110,450,1200000000),
+(16,'Redpoint Ventures',88,340,4000000000),
+(17,'First Round Capital',400,1900,3000000000),
+(18,'Y Combinator',3000,8500,4000000000),
+(19,'500 Startups',2500,7200,460000000),
+(20,'Techstars',3200,9100,290000000),
+(21,'Social Capital',45,180,2000000000),
+(22,'Lux Capital',38,145,4500000000),
+(23,'Coatue Management',12,48,7800000000),
+(24,'Insight Partners',310,1300,90000000000),
+(25,'KPCB Digital Growth',8,22,1000000000);
+
+INSERT INTO people VALUES
+(1,'Marc','Andreessen','pmarca','Andreessen Horowitz'),
+(2,'Ben','Horowitz','bhorowitz','Andreessen Horowitz'),
+(3,'Peter','Thiel','peterthiel','Founders Fund'),
+(4,'Elon','Musk','elonmusk','SpaceX'),
+(5,'Reid','Hoffman','reidhoffman','Greylock'),
+(6,'Paul','Graham','paulg','Y Combinator'),
+(7,'Jessica','Livingston','jesslivingston','Y Combinator'),
+(8,'Mike','Maples','m2jr','Floodgate'),
+(9,'Joshua','Kushner','joshkushner','Thrive Capital'),
+(10,'Silver','Lake','SilverLakeGroup','Silver Lake Partners'),
+(11,'Adam','SilverStein','SilverSteinVC','Goldcrest Capital'),
+(12,'Sandra','Silvers','SilversAngel','Angel Network'),
+(13,'Alex','Kim','moneykimVC','Seoul Capital'),
+(14,'Rachel','Kennedy','moneyrachel','Kennedy Ventures'),
+(15,'Tom','Kowalski','moneykowalski','Warsaw Fund'),
+(16,'Priya','Krishnamurthy','moneypriya','Sequoia India'),
+(17,'Derek','Knox','moneydknox','Knox Investments'),
+(18,'Bill','Gurley','bgurley','Benchmark'),
+(19,'Fred','Wilson','fredwilson','Union Square Ventures'),
+(20,'Brad','Feld','bfeld','Foundry Group'),
+(21,'Mark','Suster','msuster','Upfront Ventures'),
+(22,'Hunter','Walk','hunterwalk','Homebrew'),
+(23,'Semil','Shah','semil','Haystack'),
+(24,'Aileen','Lee','aileenlee','Cowboy Ventures'),
+(25,'Ann','Miura-Ko','annimaniac','Floodgate'),
+(26,'Maha','Ibrahim','mahaibrahim','Canaan Partners'),
+(27,'Jenny','Lee','jennylee','GGV Capital'),
+(28,'Theresia','Gouw','tgouw','Acrew Capital'),
+(29,'Kirsten','Green','kirstengreen','Forerunner Ventures'),
+(30,'Sarah','Tavel','sarahtavel','Benchmark'),
+(31,'Eric','Paley','ericpaley','Founder Collective'),
+(32,'David','SilverBerg','SilverBergDave','Insight Partners'),
+(33,'Chris','Dixon','cdixon','Andreessen Horowitz'),
+(34,'Naval','Ravikant','naval','AngelList'),
+(35,'Kevin','Systrom','kevin','Instagram');
+`;
+
+let db = null;
+
+async function initDB() {
+  try {
+    const SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}` });
+    db = new SQL.Database();
+    db.run(SCHEMA_SQL);
+    db.run(SEED_SQL);
+
+    document.getElementById('status-dot').className = 'status-dot online';
+    document.getElementById('status-text').textContent = 'SQLite database online — 5 tables loaded';
+
+    ['company','acquisition','funding_round','fund','people'].forEach(t => {
+      const r = db.exec(`SELECT COUNT(*) FROM ${t}`);
+      document.getElementById(`rc-${t}`).textContent = r[0].values[0][0];
+    });
+
+    document.getElementById('s-companies').textContent = db.exec('SELECT COUNT(*) FROM company')[0].values[0][0];
+    document.getElementById('s-closed').textContent = db.exec("SELECT COUNT(*) FROM company WHERE status='closed'")[0].values[0][0];
+    document.getElementById('s-rounds').textContent = db.exec('SELECT COUNT(*) FROM funding_round')[0].values[0][0];
+    document.getElementById('s-funds').textContent = db.exec('SELECT COUNT(*) FROM fund')[0].values[0][0];
+    document.getElementById('s-people').textContent = db.exec('SELECT COUNT(*) FROM people')[0].values[0][0];
+
+    renderSchema();
+    runQuery();
+  } catch(e) {
+    document.getElementById('status-text').textContent = 'Error: ' + e.message;
+  }
+}
+
+function runQuery() {
+  const sql = document.getElementById('sql-editor').value.trim();
+  if (!sql || !db) return;
+  const t0 = performance.now();
+  try {
+    const results = db.exec(sql);
+    const ms = (performance.now()-t0).toFixed(1);
+    if (!results || !results.length) {
+      setMeta(`<span class="tag">✓</span> Query OK — no rows returned &nbsp;·&nbsp; ${ms}ms`);
+      showEmpty('No rows returned for this query.');
+      return;
+    }
+    const {columns, values} = results[0];
+    setMeta(`<span class="tag">✓</span> ${values.length} row${values.length!==1?'s':''} &nbsp;·&nbsp; ${columns.length} col${columns.length!==1?'s':''} &nbsp;·&nbsp; ${ms}ms`);
+    renderTable(columns, values);
+    activateResultTab('data');
+  } catch(e) {
+    const ms = (performance.now()-t0).toFixed(1);
+    setMeta(`<span class="err-tag">✗ Error</span> &nbsp;·&nbsp; ${ms}ms`);
+    showError(e.message);
+  }
+}
+
+function renderTable(columns, values) {
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('error-panel').style.display = 'none';
+  const s = document.getElementById('table-scroll');
+  s.style.display = 'block';
+  let h = '<table><thead><tr>' + columns.map(c=>`<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+  values.forEach(row => {
+    h += '<tr>' + row.map((v,i) => `<td>${fmtCell(v, columns[i].toLowerCase())}</td>`).join('') + '</tr>';
+  });
+  s.innerHTML = h + '</tbody></table>';
+}
+
+function fmtCell(v, col) {
+  if (v === null || v === undefined) return '<span class="cell-null">NULL</span>';
+  const s = String(v);
+  if (s === 'high_activity') return '<span class="cell-high">high_activity</span>';
+  if (s === 'middle_activity') return '<span class="cell-mid">middle_activity</span>';
+  if (s === 'low_activity') return '<span class="cell-low">low_activity</span>';
+  if (col === 'status') {
+    if (s === 'closed') return '<span class="cell-closed">closed</span>';
+    if (s === 'operating') return '<span class="cell-operating">operating</span>';
+  }
+  if (typeof v === 'number') return `<span class="cell-num">${v.toLocaleString()}</span>`;
+  return `<span class="cell-str">${esc(s)}</span>`;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setMeta(h) { document.getElementById('result-meta').innerHTML = h; }
+function showEmpty(msg) {
+  document.getElementById('table-scroll').style.display='none';
+  document.getElementById('error-panel').style.display='none';
+  const e=document.getElementById('empty-state');
+  e.style.display='flex';
+  e.innerHTML=`<div class="empty-icon">⬜</div><div>${msg}</div>`;
+}
+function showError(msg) {
+  document.getElementById('table-scroll').style.display='none';
+  document.getElementById('empty-state').style.display='none';
+  const e=document.getElementById('error-panel');
+  e.style.display='block';
+  e.innerHTML=`<strong>SQL Error:</strong><br>${esc(msg)}<br><br><span style="color:var(--text-muted)">Tip: SQLite uses strftime('%Y',date) not EXTRACT(YEAR FROM date)</span>`;
+}
+
+function renderSchema() {
+  const tables = {
+    company:[['id','INTEGER','PK',''],['name','TEXT','',''],['status','TEXT','','closed / operating / ipo / acquired'],['country_code','TEXT','','e.g. USA, GBR, IND'],['category_code','TEXT','','e.g. news, finance, software'],['funding_total','REAL','','cumulative funding in USD'],['founded_year','INTEGER','',''],['city','TEXT','','']],
+    acquisition:[['id','INTEGER','PK',''],['acquiring_company_id','INTEGER','FK','→ company.id'],['acquired_company_id','INTEGER','FK','→ company.id'],['term_code','TEXT','','cash or stock'],['price_amount','REAL','','deal value in USD'],['acquired_at','TEXT','','YYYY-MM-DD']],
+    funding_round:[['id','INTEGER','PK',''],['company_id','INTEGER','FK','→ company.id'],['funded_at','TEXT','','YYYY-MM-DD'],['funding_round_type','TEXT','','seed / series-a / etc'],['raised_amount','REAL','','USD raised']],
+    fund:[['id','INTEGER','PK',''],['name','TEXT','','fund name'],['invested_companies','INTEGER','','portfolio count'],['investment_rounds','INTEGER','','total rounds participated'],['fund_size','REAL','','AUM in USD']],
+    people:[['id','INTEGER','PK',''],['first_name','TEXT','',''],['last_name','TEXT','',''],['twitter_username','TEXT','','handle without @'],['affiliation_name','TEXT','','']]
+  };
+  const icons={company:'🏢',acquisition:'🤝',funding_round:'💰',fund:'📁',people:'👤'};
+  let h='';
+  for(const [t,cols] of Object.entries(tables)){
+    h+=`<div class="schema-table"><div class="schema-table-name">${icons[t]} ${t}</div>
+    <div class="schema-row schema-header-row"><div>Column</div><div>Type</div><div>Key</div><div>Notes</div></div>`;
+    cols.forEach(([n,tp,k,note])=>{
+      h+=`<div class="schema-row"><div class="schema-col-name">${n}</div><div class="schema-col-type">${tp}</div><div style="color:${k==='PK'?'var(--accent)':k==='FK'?'var(--accent3)':'var(--text-dim)'};font-size:10px;">${k==='PK'?'🔑 PK':k==='FK'?'🔗 FK':''}</div><div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim)">${note}</div></div>`;
+    });
+    h+='</div>';
+  }
+  document.getElementById('schema-wrap').innerHTML=h;
+}
+
+function browseTable(t, btn) {
+  document.querySelectorAll('.table-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('sql-editor').value=`SELECT * FROM ${t} LIMIT 25;`;
+  runQuery();
+}
+
+function loadPreset(n) {
+  const p=PRESETS[n]; if(!p) return;
+  document.getElementById('sql-editor').value=p.sql;
+  runQuery();
+}
+
+function clearEditor() { document.getElementById('sql-editor').value=''; document.getElementById('sql-editor').focus(); }
+
+function switchSidebar(panel, el) {
+  document.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sidebar-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(`stab-${panel}`).classList.add('active');
+}
+
+function activateResultTab(panel) {
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.rpanel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`rp-${panel}`).classList.add('active');
+  const idx = {data:0,schema:1,learn:2}[panel];
+  document.querySelectorAll('.rtab')[idx].classList.add('active');
+}
+
+function switchResult(panel, el) {
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.rpanel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(`rp-${panel}`).classList.add('active');
+}
+
+document.getElementById('sql-editor').addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='Enter') { e.preventDefault(); runQuery(); }
+});
+
+initDB();
+</script>
+</body>
+</html>
