@@ -10,13 +10,13 @@ Data quality validation project for VentureInsight, a venture capital analytics 
 
 ## 🖥️ Interactive Demo
 
-Open the files below in any browser — no setup or installation required:
+Click the links below to open live in your browser — no setup or installation required:
 
-| File | Description |
-|------|-------------|
-| `ventureinsight-cover.html` | Animated project intro page |
-| `ventureinsight-db.html` | Live SQL explorer — run all 9 queries in your browser |
-| `ventureinsight-conclusion-final.html` | Project summary and contact links |
+| Demo | Link | Description |
+|------|------|-------------|
+| Project Intro | [▶ Open Cover Page](https://dgsalsbury1-hub.github.io/SQL-Data-Validation-Project/ventureinsight-cover.html) | Animated project intro page |
+| SQL Explorer | [▶ Open SQL Explorer](https://dgsalsbury1-hub.github.io/SQL-Data-Validation-Project/ventureinsight-db.html) | Live SQL explorer — run all 9 queries in your browser |
+| Project Summary | [▶ Open Conclusion](https://dgsalsbury1-hub.github.io/SQL-Data-Validation-Project/ventureinsight-conclusion-final.html) | Project summary and contact links |
 
 ## Overview
 
